@@ -13,7 +13,12 @@ abstract class Item implements ItemInterface
     public const TYPE_PERMISSION = 'permission';
 
     /**
-     * @var string The name of the item. This must be globally unique.
+     * @var string The name of the application. This must be globally unique.
+     */
+    private string $application;
+
+    /**
+     * @var string The name of the item. This must be unique inside application.
      */
     private string $name;
 
