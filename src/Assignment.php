@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Yiisoft\Rbac;
+namespace ffsoft\Rbac;
 
 /**
  * Assignment represents an assignment of a role or a permission to a user.
@@ -12,25 +12,31 @@ class Assignment
     /**
      * @var string The user ID. This should be a string representing the unique identifier of a user.
      */
-    private string $userId;
+    protected string $userId;
+    /**
+     * @var string
+     */
+    protected string $application;
     /**
      * @var string The role or permission name.
      */
-    private string $itemName;
+    protected string $itemName;
 
     /**
      * @var int UNIX timestamp representing the assignment creation time.
      */
-    private int $createdAt;
+    protected int $createdAt;
 
     /**
-     * @param string $userId The user ID. This should be a string representing the unique identifier of a user.
-     * @param string $itemName The role or permission name.
-     * @param int $createdAt UNIX timestamp representing the assignment creation time.
+     * @param string $userId    The user ID. This should be a string representing the unique identifier of a user.
+     * @param string $application
+     * @param string $itemName  The role or permission name.
+     * @param int    $createdAt UNIX timestamp representing the assignment creation time.
      */
-    public function __construct(string $userId, string $itemName, int $createdAt)
+    public function __construct(string $userId, string $application, string $itemName, int $createdAt)
     {
         $this->userId = $userId;
+        $this->application = $application;
         $this->itemName = $itemName;
         $this->createdAt = $createdAt;
     }

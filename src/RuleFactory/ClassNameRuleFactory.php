@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Yiisoft\Rbac\RuleFactory;
+namespace ffsoft\Rbac\RuleFactory;
 
-use Yiisoft\Rbac\Rule;
-use Yiisoft\Rbac\RuleFactoryInterface;
+use ffsoft\Rbac\Rule;
+use ffsoft\Rbac\RuleFactoryInterface;
 
 class ClassNameRuleFactory implements RuleFactoryInterface
 {

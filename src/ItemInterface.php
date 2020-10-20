@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Yiisoft\Rbac;
+namespace ffsoft\Rbac;
 
 /**
  * Common interface for authorization items:

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Yiisoft\Rbac;
+namespace ffsoft\Rbac;
 
 use Yiisoft\Access\AccessCheckerInterface;
 use InvalidArgumentException;
@@ -28,7 +28,7 @@ final class Manager implements AccessCheckerInterface
         $this->ruleFactory = $ruleFactory;
     }
 
-    public function userHasPermission($userId, string $permissionName, array $parameters = []): bool
+    public function userHasPermission($userId, string $application, string $permissionName, array $parameters = []): bool
     {
         $assignments = $this->storage->getUserAssignments($userId);
 

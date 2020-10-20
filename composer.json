@@ -1,24 +1,16 @@
 {
-    "name": "yiisoft/rbac",
+    "name": "ffsoft/rbac",
     "type": "library",
-    "description": "Yii Role-Based Access Control",
+    "description": "FFsoft Role-Based Access Control based on Yii RBAC",
     "keywords": [
         "yii",
         "rbac"
     ],
-    "homepage": "http://www.yiiframework.com/",
-    "license": "BSD-3-Clause",
-    "support": {
-        "source": "https://github.com/yiisoft/rbac",
-        "issues": "https://github.com/yiisoft/rbac/issues",
-        "forum": "http://www.yiiframework.com/forum/",
-        "wiki": "http://www.yiiframework.com/wiki/",
-        "irc": "irc://irc.freenode.net/yii"
-    },
     "minimum-stability": "dev",
     "prefer-stable": true,
     "require": {
         "php": "^7.4",
+        "doctrine/orm": "^2.7",
         "yiisoft/access": "^1.0"
     },
     "require-dev": {
@@ -31,12 +23,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Yiisoft\\Rbac\\": "src"
+            "ffsoft\\Rbac\\": "src"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Yiisoft\\Rbac\\Tests\\": "tests"
+            "ffsoft\\Rbac\\Tests\\": "tests"
         }
     },
     "extra": {

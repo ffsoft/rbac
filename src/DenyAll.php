@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Yiisoft\Rbac;
+namespace ffsoft\Rbac;
 
 use Yiisoft\Access\AccessCheckerInterface;
 

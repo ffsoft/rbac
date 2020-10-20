@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Yiisoft\Rbac;
+namespace ffsoft\Rbac;
 
 /**
  * Rule represents a business constraint that may be associated with a role, permission or assignment.
  */
 abstract class Rule implements ItemInterface
 {
-    private string $name;
+    protected string $name;
 
     public function __construct(string $name)
     {

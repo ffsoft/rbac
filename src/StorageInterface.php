@@ -2,32 +2,39 @@
 
 declare(strict_types=1);
 
-namespace Yiisoft\Rbac;
+namespace ffsoft\Rbac;
 
 /**
  * StorageInterface represents a storage for RBAC items used in {@see Manager}.
  *
- * @package Yiisoft\Rbac
+ * @package ffsoft\Rbac
  */
 interface StorageInterface
 {
     /**
      * Removes all authorization data, including roles, permissions, rules, and assignments.
+     *
+     * @param string|null $application
      */
-    public function clear(): void;
+    public function clear(?string $application = null): void;
 
     /**
      * Returns all items in the system.
+     *
+     * @param string|null $application
      * @return Item[] All items in the system.
      */
-    public function getItems(): array;
+    public function getItems(?string $application = null): array;
 
     /**
      * Returns the named item.
+     *
+     * @param string $application
      * @param string $name The item name.
+     *
      * @return Item|null The item corresponding to the specified name. Null is returned if no such item.
      */
-    public function getItemByName(string $name): ?Item;
+    public function getItemByName(string $application, string $name): ?Item;
 
     /**
      * Adds the item to RBAC system.
@@ -173,9 +180,11 @@ interface StorageInterface
 
     /**
      * Removes all role assignments for a user with ID specified.
-     * @param string $userId The user ID.
+     *
+     * @param string      $userId The user ID.
+     * @param string|null $application
      */
-    public function removeAllAssignments(string $userId): void;
+    public function removeAllAssignments(string $userId, ?string $application = null): void;
 
     /**
      * Removes all role assignments.

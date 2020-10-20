@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Yiisoft\Rbac;
+namespace ffsoft\Rbac;
 
 /**
  * For more details and usage information on Item, see the [guide article on security authorization](guide:security-authorization).
@@ -15,45 +15,62 @@ abstract class Item implements ItemInterface
     /**
      * @var string The name of the application. This must be globally unique.
      */
-    private string $application;
+    protected string $application;
 
     /**
      * @var string The name of the item. This must be unique inside application.
      */
-    private string $name;
+    protected string $name;
 
     /**
      * @var string The item description.
      */
-    private string $description = '';
+    protected string $description = '';
 
     /**
      * @var string Name of the rule associated with this item.
      */
-    private ?string $ruleName = null;
+    protected ?string $ruleName = null;
 
     /**
      * @var int UNIX timestamp representing the item creation time.
      */
-    private ?int $createdAt = null;
+    protected ?int $createdAt = null;
 
     /**
      * @var int UNIX timestamp representing the item updating time.
      */
-    private ?int $updatedAt = null;
+    protected ?int $updatedAt = null;
 
-    public function __construct(string $name)
+    public function __construct(string $application, string $name)
     {
+        $this->application = $application;
         $this->name = $name;
     }
 
     abstract public function getType(): string;
 
+    /**
+     * @return string
+     */
+    public function getApplication(): string
+    {
+        return $this->application;
+    }
+
+    /**
+     * @return string
+     */
     public function getName(): string
     {
         return $this->name;
     }
 
+    /**
+     * @param string $name
+     *
+     * @return $this
+     */
     public function withName(string $name): self
     {
         $new = clone $this;
@@ -61,6 +78,11 @@ abstract class Item implements ItemInterface
         return $new;
     }
 
+    /**
+     * @param string $description
+     *
+     * @return $this
+     */
     public function withDescription(string $description): self
     {
         $new = clone $this;
@@ -68,11 +90,19 @@ abstract class Item implements ItemInterface
         return $new;
     }
 
+    /**
+     * @return string
+     */
     public function getDescription(): string
     {
         return $this->description;
     }
 
+    /**
+     * @param string|null $ruleName
+     *
+     * @return $this
+     */
     public function withRuleName(?string $ruleName): self
     {
         $new = clone $this;
@@ -80,11 +110,19 @@ abstract class Item implements ItemInterface
         return $new;
     }
 
+    /**
+     * @return string|null
+     */
     public function getRuleName(): ?string
     {
         return $this->ruleName;
     }
 
+    /**
+     * @param int $createdAt
+     *
+     * @return $this
+     */
     public function withCreatedAt(int $createdAt): self
     {
         $new = clone $this;
@@ -92,11 +130,19 @@ abstract class Item implements ItemInterface
         return $new;
     }
 
+    /**
+     * @return int|null
+     */
     public function getCreatedAt(): ?int
     {
         return $this->createdAt;
     }
 
+    /**
+     * @param int $updatedAt
+     *
+     * @return $this
+     */
     public function withUpdatedAt(int $updatedAt): self
     {
         $new = clone $this;
@@ -104,24 +150,37 @@ abstract class Item implements ItemInterface
         return $new;
     }
 
+    /**
+     * @return int|null
+     */
     public function getUpdatedAt(): ?int
     {
         return $this->updatedAt;
     }
 
+    /**
+     * @return bool
+     */
     public function hasCreatedAt(): bool
     {
         return $this->createdAt !== null;
     }
 
+    /**
+     * @return bool
+     */
     public function hasUpdatedAt(): bool
     {
         return $this->updatedAt !== null;
     }
 
+    /**
+     * @return array
+     */
     public function getAttributes(): array
     {
         return [
+            'application' => $this->getApplication(),
             'name' => $this->getName(),
             'description' => $this->getDescription(),
             'ruleName' => $this->getRuleName(),
