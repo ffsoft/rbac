@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace ffsoft\Rbac;
 
-use Yiisoft\Access\AccessCheckerInterface;
+use Closure;
+use Exception;
+use ffsoft\Access\AccessCheckerInterface;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -28,6 +30,14 @@ final class Manager implements AccessCheckerInterface
         $this->ruleFactory = $ruleFactory;
     }
 
+    /**
+     * @param mixed  $userId
+     * @param string $application
+     * @param string $permissionName
+     * @param array  $parameters
+     *
+     * @return bool
+     */
     public function userHasPermission($userId, string $application, string $permissionName, array $parameters = []): bool
     {
         $assignments = $this->storage->getUserAssignments($userId);
@@ -36,11 +46,11 @@ final class Manager implements AccessCheckerInterface
             return false;
         }
 
-        if ($this->storage->getPermissionByName($permissionName) === null) {
+        if ($this->storage->getPermissionByName($application, $permissionName) === null) {
             return false;
         }
 
-        return $this->userHasPermissionRecursive($userId, $permissionName, $parameters, $assignments);
+        return $this->userHasPermissionRecursive($userId, $application, $permissionName, $parameters, $assignments);
     }
 
     /**
@@ -67,19 +77,19 @@ final class Manager implements AccessCheckerInterface
      */
     public function addChild(Item $parent, Item $child): void
     {
-        if (!$this->hasItem($parent->getName())) {
+        if (!$this->hasItem($parent)) {
             throw new InvalidArgumentException(
                 sprintf('Either "%s" does not exist.', $parent->getName())
             );
         }
 
-        if (!$this->hasItem($child->getName())) {
+        if (!$this->hasItem($child)) {
             throw new InvalidArgumentException(
                 sprintf('Either "%s" does not exist.', $child->getName())
             );
         }
 
-        if ($parent->getName() === $child->getName()) {
+        if ($parent->isEquals($child)) {
             throw new InvalidArgumentException(sprintf('Cannot add "%s" as a child of itself.', $parent->getName()));
         }
 
@@ -99,7 +109,7 @@ final class Manager implements AccessCheckerInterface
             );
         }
 
-        if (isset($this->storage->getChildrenByName($parent->getName())[$child->getName()])) {
+        if ($this->hasChild($parent, $child)) {
             throw new RuntimeException(
                 sprintf('The item "%s" already has a child "%s".', $parent->getName(), $child->getName())
             );
@@ -119,9 +129,7 @@ final class Manager implements AccessCheckerInterface
      */
     public function removeChild(Item $parent, Item $child): void
     {
-        if ($this->hasChild($parent, $child)) {
-            $this->storage->removeChild($parent, $child);
-        }
+        $this->storage->removeChild($parent, $child);
     }
 
     /**
@@ -134,9 +142,7 @@ final class Manager implements AccessCheckerInterface
      */
     public function removeChildren(Item $parent): void
     {
-        if ($this->storage->hasChildren($parent->getName())) {
-            $this->storage->removeChildren($parent);
-        }
+        $this->storage->removeChildren($parent);
     }
 
     /**
@@ -149,7 +155,14 @@ final class Manager implements AccessCheckerInterface
      */
     public function hasChild(Item $parent, Item $child): bool
     {
-        return array_key_exists($child->getName(), $this->storage->getChildrenByName($parent->getName()));
+        $children = $this->storage->getChildrenByName($parent->getApplication(), $parent->getName());
+        foreach ($children as $item) {
+            if ($child->isEquals($item)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -164,11 +177,11 @@ final class Manager implements AccessCheckerInterface
      */
     public function assign(Item $item, string $userId): Assignment
     {
-        if (!$this->hasItem($item->getName())) {
+        if (!$this->hasItem($item)) {
             throw new InvalidArgumentException(sprintf('Unknown %s "%s".', $item->getType(), $item->getName()));
         }
 
-        if ($this->storage->getUserAssignmentByName($userId, $item->getName()) !== null) {
+        if ($this->storage->getUserAssignmentByName($userId, $item->getApplication(), $item->getName()) !== null) {
             throw new InvalidArgumentException(
                 sprintf('"%s" %s has already been assigned to user %s.', $item->getName(), $item->getType(), $userId)
             );
@@ -176,7 +189,7 @@ final class Manager implements AccessCheckerInterface
 
         $this->storage->addAssignment($userId, $item);
 
-        return $this->storage->getUserAssignmentByName($userId, $item->getName());
+        return $this->storage->getUserAssignmentByName($userId, $item->getApplication(), $item->getName());
     }
 
     /**
@@ -189,7 +202,7 @@ final class Manager implements AccessCheckerInterface
      */
     public function revoke(Item $role, string $userId): void
     {
-        if ($this->storage->getUserAssignmentByName($userId, $role->getName()) !== null) {
+        if ($this->storage->getUserAssignmentByName($userId, $role->getApplication(), $role->getName()) !== null) {
             $this->storage->removeAssignment($userId, $role);
         }
     }
@@ -210,17 +223,18 @@ final class Manager implements AccessCheckerInterface
      * Returns the roles that are assigned to the user via {@see assign()}.
      * Note that child roles that are not assigned directly to the user will not be returned.
      *
-     * @param string $userId The user ID.
+     * @param string      $userId The user ID.
+     * @param string|null $application
      *
-     * @return Role[] All roles directly assigned to the user. The array is indexed by the role names.
+     * @return Role[][] All roles directly assigned to the user. The array is indexed by the role names.
      */
-    public function getRolesByUser(string $userId): array
+    public function getRolesByUser(string $userId, ?string $application = null): array
     {
-        $roles = $this->getDefaultRoleInstances();
-        foreach ($this->storage->getUserAssignments($userId) as $name => $assignment) {
-            $role = $this->storage->getRoleByName($assignment->getItemName());
+        $roles = $this->getDefaultRoleInstances($application);
+        foreach ($this->storage->getUserAssignments($userId, $application) as $assignment) {
+            $role = $this->storage->getRoleByName($assignment->getApplication(), $assignment->getItemName());
             if ($role !== null) {
-                $roles[$name] = $role;
+                $roles[$role->getApplication()][$role->getName()] = $role;
             }
         }
 
@@ -230,22 +244,22 @@ final class Manager implements AccessCheckerInterface
     /**
      * Returns child roles of the role specified. Depth isn't limited.
      *
+     * @param string $application
      * @param string $roleName name of the role to file child roles for
      *
      * @return Role[] Child roles. The array is indexed by the role names.
      * First element is an instance of the parent Role itself.
      *
-     * @throws InvalidArgumentException If Role was not found that are getting by $roleName
      */
-    public function getChildRoles(string $roleName): array
+    public function getChildRoles(string $application, string $roleName): array
     {
-        $role = $this->storage->getRoleByName($roleName);
+        $role = $this->storage->getRoleByName($application, $roleName);
         if ($role === null) {
             throw new InvalidArgumentException(sprintf('Role "%s" not found.', $roleName));
         }
 
         $result = [];
-        $this->getChildrenRecursive($roleName, $result);
+        $this->getChildrenRecursive($application, $roleName, $result);
 
         return array_merge([$roleName => $role], $this->getRolesPresentInArray($result));
     }
@@ -253,34 +267,36 @@ final class Manager implements AccessCheckerInterface
     /**
      * Returns all permissions that the specified role represents.
      *
+     * @param string $application
      * @param string $roleName The role name.
      *
      * @return Permission[] All permissions that the role represents. The array is indexed by the permission names.
      */
-    public function getPermissionsByRole(string $roleName): array
+    public function getPermissionsByRole(string $application, string $roleName): array
     {
         $result = [];
-        $this->getChildrenRecursive($roleName, $result);
+        $this->getChildrenRecursive($application, $roleName, $result);
 
         if (empty($result)) {
             return [];
         }
 
-        return $this->normalizePermissions($result);
+        return $this->normalizePermissions($application, $result);
     }
 
     /**
      * Returns all permissions that the user has.
      *
-     * @param string $userId The user ID.
+     * @param string      $userId The user ID.
+     * @param string|null $application
      *
      * @return Permission[] All permissions that the user has. The array is indexed by the permission names.
      */
-    public function getPermissionsByUser(string $userId): array
+    public function getPermissionsByUser(string $userId, ?string $application = null): array
     {
         return array_merge(
-            $this->getDirectPermissionsByUser($userId),
-            $this->getInheritedPermissionsByUser($userId)
+            $this->getDirectPermissionsByUser($userId, $application),
+            $this->getInheritedPermissionsByUser($userId, $application)
         );
     }
 
@@ -332,9 +348,9 @@ final class Manager implements AccessCheckerInterface
      * @param string $name
      * @param Role $role
      */
-    public function updateRole(string $name, Role $role): void
+    public function updateRole(string $application, string $name, Role $role): void
     {
-        $this->checkItemNameForUpdate($role, $name);
+        $this->checkItemNameForUpdate($role, $application, $name);
         $this->createItemRuleIfNotExist($role);
         $this->storage->updateItem($name, $role);
     }
@@ -357,12 +373,14 @@ final class Manager implements AccessCheckerInterface
     }
 
     /**
-     * @param string $name
+     * @param string     $name
      * @param Permission $permission
+     *
+     * @throws Exception
      */
-    public function updatePermission(string $name, Permission $permission): void
+    public function updatePermission(string $application, string $name, Permission $permission): void
     {
-        $this->checkItemNameForUpdate($permission, $name);
+        $this->checkItemNameForUpdate($permission, $application, $name);
         $this->createItemRuleIfNotExist($permission);
         $this->storage->updateItem($name, $permission);
     }
@@ -400,7 +418,7 @@ final class Manager implements AccessCheckerInterface
     /**
      * Set default roles.
      *
-     * @param string[]|\Closure $roles either array of roles or a closure returning it
+     * @param string[]|Closure $roles either array of roles or a closure returning it
      *
      * @return $this
      * @throws InvalidArgumentException When $roles is neither array nor closure.
@@ -413,7 +431,7 @@ final class Manager implements AccessCheckerInterface
             return $this;
         }
 
-        if ($roles instanceof \Closure) {
+        if ($roles instanceof Closure) {
             $roles = $roles();
             if (!is_array($roles)) {
                 throw new RuntimeException('Default roles closure must return an array.');
@@ -428,24 +446,38 @@ final class Manager implements AccessCheckerInterface
     /**
      * Get default roles.
      *
+     * @param string|null $application
+     *
      * @return string[] Default roles.
      */
-    public function getDefaultRoles(): array
+    public function getDefaultRoles(?string $application = null): array
     {
-        return $this->defaultRoles;
+        return $application === null ? $this->defaultRoles : ($this->defaultRoles[$application] ?? []);
     }
 
     /**
      * Returns defaultRoles as array of Role objects.
      *
-     * @return Role[] Default roles. The array is indexed by the role names.
+     * @param string $application
      *
+     * @return Role[][] Default roles. The array is indexed by the role names.
      */
-    public function getDefaultRoleInstances(): array
+    public function getDefaultRoleInstances(?string $application = null): array
     {
         $result = [];
-        foreach ($this->defaultRoles as $roleName) {
-            $result[$roleName] = new Role($roleName);
+        if ($application === null) {
+            foreach ($this->defaultRoles as $app => $applicationRoles) {
+                foreach ($applicationRoles as $roleName) {
+                    $result[$app][$roleName] = new Role($app, $roleName);
+                }
+            }
+        } else {
+            if (empty($this->defaultRoles[$application])) {
+                return [];
+            }
+            foreach ($this->defaultRoles[$application] as $roleName) {
+                $result[$application][$roleName] = new Role($application, $roleName);
+            }
         }
 
         return $result;
@@ -523,16 +555,27 @@ final class Manager implements AccessCheckerInterface
         }
     }
 
-    private function hasItem(string $name): bool
+    /**
+     * @param Item $item
+     *
+     * @return bool
+     */
+    protected function hasItem(Item $item): bool
     {
-        return $this->storage->getItemByName($name) !== null;
+        return $this->storage->getItemByName($item->getApplication(), $item->getName()) !== null;
     }
 
-    private function normalizePermissions(array $permissions): array
+    /**
+     * @param string $application
+     * @param array  $permissions
+     *
+     * @return array
+     */
+    protected function normalizePermissions(string $application, array $permissions): array
     {
         $normalizePermissions = [];
         foreach (array_keys($permissions) as $itemName) {
-            $permission = $this->storage->getPermissionByName($itemName);
+            $permission = $this->storage->getPermissionByName($application, $itemName);
             if ($permission !== null) {
                 $normalizePermissions[$itemName] = $permission;
             }
@@ -541,21 +584,21 @@ final class Manager implements AccessCheckerInterface
         return $normalizePermissions;
     }
 
-
     /**
      * Returns all permissions that are directly assigned to user.
      *
-     * @param string $userId The user ID.
+     * @param string      $userId The user ID.
+     * @param string|null $application
      *
-     * @return Permission[] All direct permissions that the user has. The array is indexed by the permission names.
+     * @return Permission[][] All direct permissions that the user has. The array is indexed by the permission names.
      */
-    private function getDirectPermissionsByUser(string $userId): array
+    protected function getDirectPermissionsByUser(string $userId, ?string $application = null): array
     {
         $permissions = [];
-        foreach ($this->storage->getUserAssignments($userId) as $name => $assignment) {
-            $permission = $this->storage->getPermissionByName($assignment->getItemName());
+        foreach ($this->storage->getUserAssignments($userId, $application) as $name => $assignment) {
+            $permission = $this->storage->getPermissionByName($assignment->getApplication(), $assignment->getItemName());
             if ($permission !== null) {
-                $permissions[$name] = $permission;
+                $permissions[$permission->getApplication()][$permission->getName()] = $permission;
             }
         }
 
@@ -565,28 +608,33 @@ final class Manager implements AccessCheckerInterface
     /**
      * Returns all permissions that the user inherits from the roles assigned to him.
      *
-     * @param string $userId The user ID.
+     * @param string      $userId The user ID.
+     * @param string|null $application
      *
-     * @return Permission[] All inherited permissions that the user has. The array is indexed by the permission names.
+     * @return Permission[][] All inherited permissions that the user has. The array is indexed by the permission names.
      */
-    private function getInheritedPermissionsByUser(string $userId): array
+    private function getInheritedPermissionsByUser(string $userId, ?string $application = null): array
     {
-        $assignments = $this->storage->getUserAssignments($userId);
+        $assignments = $this->storage->getUserAssignments($userId, $application);
         $result = [];
         foreach (array_keys($assignments) as $roleName) {
-            $this->getChildrenRecursive($roleName, $result);
+            $this->getChildrenRecursive($application, $roleName, $result);
         }
 
         if (empty($result)) {
             return [];
         }
 
-        return $this->normalizePermissions($result);
+        foreach ($result as $app => $list) {
+            $result[$app] = $this->normalizePermissions($app, $list);
+        }
+
+        return $result;
     }
 
     private function removeItem(Item $item): void
     {
-        if ($this->hasItem($item->getName())) {
+        if ($this->hasItem($item)) {
             $this->storage->removeItem($item);
         }
     }
@@ -594,23 +642,24 @@ final class Manager implements AccessCheckerInterface
     /**
      * Performs access check for the specified user.
      *
-     * @param string $user The user ID. This should br a string representing the unique identifier of a user.
-     * @param string $itemName The name of the permission or role that need access check.
-     * @param array $params Name-value pairs that would be passed to rules associated
-     * with the permissions and roles assigned to the user. A param with name 'user' is
-     * added to this array, which holds the value of `$userId`.
+     * @param string       $user        The user ID. This should br a string representing the unique identifier of a user.
+     * @param string       $application
+     * @param string       $itemName    The name of the permission or role that need access check.
+     * @param array        $params      Name-value pairs that would be passed to rules associated
+     *                                  with the permissions and roles assigned to the user. A param with name 'user' is
+     *                                  added to this array, which holds the value of `$userId`.
      * @param Assignment[] $assignments The assignments to the specified user.
      *
      * @return bool Whether the operations can be performed by the user.
-     * @throws RuntimeException
      */
     private function userHasPermissionRecursive(
         string $user,
+        string $application,
         string $itemName,
         array $params,
         array $assignments
     ): bool {
-        $item = $this->storage->getItemByName($itemName);
+        $item = $this->storage->getItemByName($application, $itemName);
         if ($item === null) {
             return false;
         }
@@ -626,6 +675,7 @@ final class Manager implements AccessCheckerInterface
         foreach ($this->storage->getChildren() as $parentName => $children) {
             if (isset($children[$itemName]) && $this->userHasPermissionRecursive(
                 $user,
+                $application,
                 $parentName,
                 $params,
                 $assignments
@@ -647,11 +697,11 @@ final class Manager implements AccessCheckerInterface
      */
     private function detectLoop(Item $parent, Item $child): bool
     {
-        if ($child->getName() === $parent->getName()) {
+        if ($parent->isEquals($child)) {
             return true;
         }
 
-        $children = $this->storage->getChildrenByName($child->getName());
+        $children = $this->storage->getChildrenByName($child->getApplication(), $child->getName());
         if (empty($children)) {
             return false;
         }
@@ -668,23 +718,29 @@ final class Manager implements AccessCheckerInterface
     /**
      * Recursively finds all children and grand children of the specified item.
      *
-     * @param string $name The name of the item whose children are to be looked for.
-     * @param array $result The children and grand children (in array keys).
+     * @param string $application
+     * @param string $name   The name of the item whose children are to be looked for.
+     * @param array  $result The children and grand children (in array keys).
      */
-    private function getChildrenRecursive(string $name, &$result): void
+    protected function getChildrenRecursive(string $application, string $name, &$result): void
     {
-        $children = $this->storage->getChildrenByName($name);
+        $children = $this->storage->getChildrenByName($application, $name);
         if (empty($children)) {
             return;
         }
 
         foreach ($children as $childName => $child) {
             $result[$childName] = true;
-            $this->getChildrenRecursive($childName, $result);
+            $this->getChildrenRecursive($application, $childName, $result);
         }
     }
 
-    private function getRolesPresentInArray(array $array): array
+    /**
+     * @param array $array
+     *
+     * @return array
+     */
+    protected function getRolesPresentInArray(array $array): array
     {
         return array_filter(
             $this->storage->getRoles(),
@@ -694,14 +750,34 @@ final class Manager implements AccessCheckerInterface
         );
     }
 
-    private function canBeParent(Item $parent, Item $child): bool
+    /**
+     * @param Item $parent
+     * @param Item $child
+     *
+     * @return bool
+     */
+    protected function canBeParent(Item $parent, Item $child): bool
     {
+        if ($parent->getApplication() !== $child->getApplication()) {
+            return false;
+        }
         return $parent->getType() !== Item::TYPE_PERMISSION || $child->getType() !== Item::TYPE_ROLE;
     }
 
-    private function checkItemNameForUpdate(Item $item, string $name): void
+    /**
+     * @param Item   $item
+     * @param string $application
+     * @param string $name
+     *
+     * @throws Exception
+     */
+    protected function checkItemNameForUpdate(Item $item, string $application, string $name): void
     {
-        if ($item->getName() === $name || !$this->hasItem($item->getName())) {
+        if ($item->getApplication() !== $application) {
+            throw new Exception();
+        }
+
+        if ($item->getName() === $name || !$this->hasItem($item)) {
             return;
         }
 

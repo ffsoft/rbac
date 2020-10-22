@@ -175,6 +175,19 @@ abstract class Item implements ItemInterface
     }
 
     /**
+     * @param Item $item
+     *
+     * @return bool
+     */
+    public function isEquals(Item $item): bool
+    {
+        return $this->getApplication() === $item->getApplication()
+            && $this->getName() === $item->getName()
+            && $this->getType() === $item->getType()
+            ;
+    }
+
+    /**
      * @return array
      */
     public function getAttributes(): array

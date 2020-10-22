@@ -41,23 +41,47 @@ class Assignment
         $this->createdAt = $createdAt;
     }
 
+    /**
+     * @return string
+     */
     public function getUserId(): string
     {
         return $this->userId;
     }
 
+    /**
+     * @return string
+     */
+    public function getApplication(): string
+    {
+        return $this->application;
+    }
+
+    /**
+     * @return string
+     */
     public function getItemName(): string
     {
         return $this->itemName;
     }
 
-    public function withItemName(string $roleName): self
+    /**
+     * @param string $application
+     * @param string $roleName
+     *
+     * @return $this
+     */
+    public function withItemName(string $application, string $roleName): self
     {
         $new = clone $this;
+        $new->application = $application;
         $new->itemName = $roleName;
         return $new;
     }
 
+    /**
+     * @return int
+     */
     public function getCreatedAt(): int
     {
         return $this->createdAt;

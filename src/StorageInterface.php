@@ -68,10 +68,13 @@ interface StorageInterface
 
     /**
      * Returns the named role.
+     *
+     * @param string $application
      * @param string $name The role name.
+     *
      * @return Role|null The role corresponding to the specified name. Null is returned if no such role.
      */
-    public function getRoleByName(string $name): ?Role;
+    public function getRoleByName(string $application, string $name): ?Role;
 
     /**
      * Removes all roles.
@@ -87,10 +90,13 @@ interface StorageInterface
 
     /**
      * Returns the named permission.
+     *
+     * @param string $application
      * @param string $name The permission name.
+     *
      * @return Permission|null The permission corresponding to the specified name. Null is returned if no such permission.
      */
-    public function getPermissionByName(string $name): ?Permission;
+    public function getPermissionByName(string $application, string $name): ?Permission;
 
     /**
      * Removes all permissions.
@@ -101,17 +107,22 @@ interface StorageInterface
     /**
      * Returns the child permissions and/or roles.
      *
+     * @param string $application
      * @param string $name The parent name.
+     *
      * @return Item[] The child permissions and/or roles.
      */
-    public function getChildrenByName(string $name): array;
+    public function getChildrenByName(string $application, string $name): array;
 
     /**
      * Returns whether named parent has children.
+     *
+     * @param string $application
      * @param string $name The parent name.
+     *
      * @return bool Whether named parent has children.
      */
-    public function hasChildren(string $name): bool;
+    public function hasChildren(string $application, string $name): bool;
 
     /**
      * Adds an item as a child of another item.
@@ -143,19 +154,25 @@ interface StorageInterface
 
     /**
      * Returns all role assignment information for the specified user.
-     * @param string $userId The user ID.
+     *
+     * @param string      $userId The user ID.
+     * @param string|null $application
+     *
      * @return Assignment[] The assignments. An empty array will be
      * returned if there is no role assigned to the user.
      */
-    public function getUserAssignments(string $userId): array;
+    public function getUserAssignments(string $userId, ?string $application = null): array;
 
     /**
      * Returns role assignment for the specified item name that belongs to user with the specified ID.
+     *
      * @param string $userId The user ID.
-     * @param string $name Role name.
+     * @param string $application
+     * @param string $name   Role name.
+     *
      * @return Assignment|null Assignment or null if there is no role assigned to the user.
      */
-    public function getUserAssignmentByName(string $userId, string $name): ?Assignment;
+    public function getUserAssignmentByName(string $userId, string $application, string $name): ?Assignment;
 
     /**
      * Adds assignment of the role to the user with ID specified.
@@ -166,10 +183,13 @@ interface StorageInterface
 
     /**
      * Returns whether there is assignment for a named role or permission.
+     *
+     * @param string $application
      * @param string $name Name of the role or the permission.
+     *
      * @return bool Whether there is assignment.
      */
-    public function assignmentExist(string $name): bool;
+    public function assignmentExist(string $application, string $name): bool;
 
     /**
      * Removes assignment of a role to the user with ID specified.
